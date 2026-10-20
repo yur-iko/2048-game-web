@@ -1,4 +1,4 @@
-# 2048 — Good things add up.
+# 2048
 
 A complete, responsive 2048 game built with plain HTML, CSS, and JavaScript. It runs entirely in the browser and can be published directly from this repository with GitHub Pages. No install, build step, CDN, account, or backend is required to play.
 
