@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>2048 browser integration tests</title><style>body{font:15px system-ui;margin:30px;color:#252a25;background:#f5f3eb}button{padding:12px 20px}iframe{width:390px;height:700px;border:1px solid #ccc;float:right}li{margin:8px 0}.pass{color:#285b23}.fail{color:#a21e19}pre{white-space:pre-wrap}</style></head><body>
+<h1>2048 browser integration tests</h1><p>Runs the real app in a same-origin iframe with controlled saved boards. Restores this test origin’s previous saved state afterward.</p><button id="run">Run tests</button><iframe title="Game under test"></iframe><ol id="results"></ol><pre id="summary" role="status"></pre>
+<script>
+'use strict';
+const frame = document.querySelector('iframe');
+const key = 'good-things-2048-v1';
+const bestKey = 'good-things-2048-best';
+const pause = () => new Promise(resolve => setTimeout(resolve, 220));
+const board = () => Array.from({ length: 4 }, () => [0, 0, 0, 0]);
+const assert = (value, message) => { if (!value) throw new Error(message); };
+const saved = () => JSON.parse(localStorage.getItem(key));
+const sum = grid => grid.flat().reduce((a, b) => a + b, 0);
+const count = grid => grid.flat().filter(Boolean).length;
+const doc = () => frame.contentDocument;
+const win = () => frame.contentWindow;
+
+async function load(grid, score = 0, best = 0, extra = {}) {
+  localStorage.setItem(key, JSON.stringify({ version: 1, board: grid, score, won: false, continued: false, ...extra }));
+  localStorage.setItem(bestKey, String(best));
+  await reload();
+}
+async function reload() {
+  frame.removeAttribute('srcdoc');
+  await new Promise(resolve => { frame.onload = resolve; frame.src = '../index.html?case=' + Math.random(); });
+}
+function press(key, extra = {}) {
+  const event = new (win().KeyboardEvent)('keydown', { key, bubbles: true, cancelable: true, ...extra });
+  doc().body.dispatchEvent(event);
+  return event;
+}
+function touch(type, points, ended = []) {
+  const target = doc().querySelector('#board');
+  const make = point => new (win().Touch)({ identifier: point.id || 1, target, clientX: point.x, clientY: point.y });
+  const event = new (win().TouchEvent)(type, { bubbles: true, cancelable: true, touches: points.map(make), changedTouches: ended.map(make) });
+  target.dispatchEvent(event);
+  return event;
+}
+
+document.querySelector('#run').onclick = async () => {
+  const previous = localStorage.getItem(key);
+  const previousBest = localStorage.getItem(bestKey);
+  const results = document.querySelector('#results');
+  const summary = document.querySelector('#summary');
+  results.replaceChildren();
+  summary.textContent = 'Running…';
+  document.querySelector('#run').disabled = true;
+  let passed = 0;
+  let failed = 0;
+  async function test(name, action) {
+    const item = document.createElement('li');
+    try { await action(); item.textContent = 'PASS — ' + name; item.className = 'pass'; passed++; }
+    catch (error) { item.textContent = 'FAIL — ' + name + ': ' + error.message; item.className = 'fail'; failed++; }
+    results.append(item);
+  }
+  try {
+    await test('real keyboard merge, score, single spawn, and accessible board', async () => {
+      const grid = board(); grid[0] = [2, 2, 4, 0];
+      await load(grid);
+      const event = press('ArrowLeft'); await pause();
+      const result = saved();
+      assert(event.defaultPrevented, 'arrow scroll not prevented');
+      assert(result.board[0][0] === 4 && result.board[0][1] === 4, 'chain merge error');
+      assert(result.score === 4 && count(result.board) === 3, 'wrong score or spawn count');
+      assert([10, 12].includes(sum(result.board)), 'wrong spawned value');
+      assert(doc().querySelector('#score').textContent === '4', 'score UI stale');
+      assert(doc().querySelectorAll('#accessible-board td').length === 16, 'screen reader cells missing');
+    });
+    await test('invalid move does not spawn or change saved state', async () => {
+      const grid = board(); grid[0] = [2, 4, 0, 0]; await load(grid);
+      const before = localStorage.getItem(key); press('ArrowLeft'); await pause();
+      assert(localStorage.getItem(key) === before, 'no-op altered state');
+    });
+    await test('direction buttons move the real board', async () => {
+      const grid = board(); grid[1][1] = 2; await load(grid);
+      doc().querySelector('[data-direction="up"]').click(); await pause();
+      assert(saved().board[0][1] === 2 && count(saved().board) === 2, 'button failed');
+    });
+    await test('win overlay, blocked input, continue, and persisted win acknowledgment', async () => {
+      const grid = board(); grid[0] = [1024, 1024, 0, 0]; await load(grid);
+      press('ArrowLeft'); await pause();
+      assert(!doc().querySelector('#game-overlay').hidden, 'win overlay missing');
+      assert(doc().querySelector('#overlay-title').textContent === 'You made it.', 'wrong overlay');
+      assert(saved().score === 2048, 'win score wrong');
+      const before = localStorage.getItem(key); press('ArrowDown'); await pause();
+      assert(localStorage.getItem(key) === before, 'input changed board behind win overlay');
+      doc().querySelector('#keep-playing').click();
+      assert(doc().querySelector('#game-overlay').hidden && saved().continued, 'continue failed');
+      await reload();
+      assert(doc().querySelector('#game-overlay').hidden, 'win repeated after reload');
+    });
+    const dead = [[2, 4, 2, 4], [4, 2, 4, 2], [2, 4, 2, 4], [4, 2, 4, 2]];
+    await test('game over shown on a blocked full board, play again clears it', async () => {
+      await load(dead, 120, 200);
+      assert(!doc().querySelector('#game-overlay').hidden, 'game over missing');
+      assert(doc().querySelector('#keep-playing').hidden, 'continue shown on dead board');
+      doc().querySelector('#try-again').click();
+      assert(count(saved().board) === 2 && saved().score === 0, 'restart failed');
+      assert(localStorage.getItem(bestKey) === '200', 'best erased');
+    });
+    await test('a full board with a vertical pair remains playable', async () => {
+      const grid = dead.map(row => row.slice()); grid[1][0] = 2; await load(grid);
+      assert(doc().querySelector('#game-overlay').hidden, 'false game over');
+    });
+    for (const [name, end, destination] of [
+      ['left', { x: 40, y: 140 }, [1, 0]], ['right', { x: 240, y: 140 }, [1, 3]],
+      ['up', { x: 140, y: 40 }, [0, 1]], ['down', { x: 140, y: 240 }, [3, 1]]
+    ]) await test('touch start/move/end swipes ' + name + ' and prevents scrolling', async () => {
+      const grid = board(); grid[1][1] = 2; await load(grid);
+      const scrollY = win().scrollY;
+      touch('touchstart', [{ x: 140, y: 140 }]);
+      const event = touch('touchmove', [end]);
+      touch('touchend', [], [end]); await pause();
+      assert(event.defaultPrevented, 'touchmove not canceled');
+      assert(win().getComputedStyle(doc().querySelector('#board')).touchAction === 'none', 'native touch scrolling not disabled');
+      assert(saved().board[destination[0]][destination[1]] === 2 && count(saved().board) === 2, 'swipe direction wrong');
+      assert(win().scrollY === scrollY, 'page scrolled');
+    });
+    await test('taps, canceled swipes, and multi-touch do not move', async () => {
+      const grid = board(); grid[1][1] = 2; await load(grid);
+      const before = localStorage.getItem(key);
+      touch('touchstart', [{ x: 100, y: 100 }]); touch('touchend', [], [{ x: 110, y: 103 }]);
+      touch('touchstart', [{ x: 100, y: 100 }]); touch('touchcancel', []); touch('touchend', [], [{ x: 200, y: 100 }]);
+      touch('touchstart', [{ x: 100, y: 100 }, { id: 2, x: 200, y: 100 }]); touch('touchend', [], [{ x: 240, y: 100 }]);
+      await pause(); assert(localStorage.getItem(key) === before, 'tap/cancel/multitouch changed game');
+    });
+    await test('restart during movement cancels stale animation and keeps best', async () => {
+      const grid = board(); grid[0] = [2, 2, 0, 0]; await load(grid, 32, 100);
+      press('ArrowRight'); press('ArrowDown'); doc().querySelector('#new-game').click(); await pause();
+      assert(count(saved().board) === 2 && saved().score === 0, 'old animation overwrote restart');
+      assert(doc().querySelectorAll('.tile').length === 2 && doc().querySelector('#score').textContent === '0', 'UI does not match new game');
+      assert(doc().querySelector('#best').textContent === '100', 'best lost');
+    });
+    await test('saved progress restores after reload', async () => {
+      const grid = board(); grid[0] = [2, 8, 16, 4]; await load(grid, 88, 120);
+      await reload();
+      assert(doc().querySelector('#score').textContent === '88' && doc().querySelector('#best').textContent === '120', 'scores not restored');
+      assert(doc().querySelectorAll('.tile').length === 4, 'board not restored');
+    });
+    await test('corrupt JSON and invalid saved boards recover to a fresh game', async () => {
+      localStorage.setItem(key, '{broken'); await reload();
+      assert(count(saved().board) === 2, 'bad JSON not recovered');
+      await load([[3]], -1);
+      assert(saved().score === 0 && count(saved().board) === 2, 'bad board not recovered');
+    });
+    await test('modified arrow shortcuts leave the game unchanged', async () => {
+      const grid = board(); grid[1][1] = 2; await load(grid);
+      const before = localStorage.getItem(key); press('ArrowLeft', { ctrlKey: true }); await pause();
+      assert(localStorage.getItem(key) === before, 'browser shortcut moved tiles');
+    });
+    await test('six-digit scores fit beside New Game at a 320px viewport', async () => {
+      frame.style.width = '320px';
+      const grid = board(); grid[0][0] = 2; await load(grid, 999999, 999999);
+      const boxes = [...doc().querySelectorAll('.score-box')].map(element => element.getBoundingClientRect());
+      const button = doc().querySelector('#new-game').getBoundingClientRect();
+      assert(boxes[1].right + 4 <= button.left, 'best score overlaps New Game');
+      for (const value of doc().querySelectorAll('.score-value')) {
+        assert(value.scrollWidth <= value.clientWidth, 'score text overflows its box');
+        assert(value.getBoundingClientRect().height <= parseFloat(win().getComputedStyle(value).lineHeight) + 1, 'six-digit score wraps to multiple lines');
+      }
+      assert(doc().documentElement.scrollWidth <= win().innerWidth, 'large scores cause page overflow');
+      frame.style.width = '390px';
+    });
+    await test('blocked local storage still permits gameplay and shows recovery message', async () => {
+      const html = await (await fetch('../index.html')).text();
+      const injection = '<base href="../"><script>Object.defineProperty(window,"localStorage",{get(){throw new DOMException("Blocked","SecurityError")}})<\/script>';
+      await new Promise(resolve => { frame.onload = resolve; frame.srcdoc = html.replace('<head>', '<head>' + injection); });
+      assert(!doc().querySelector('#storage-notice').hidden, 'storage message missing');
+      assert(doc().querySelectorAll('.tile').length === 2, 'game failed to start');
+      press('ArrowDown'); await pause();
+      assert(doc().querySelectorAll('.tile').length >= 2, 'game stopped without storage');
+    });
+    // Leave this edge case visible for screenshot inspection after restoring saved data.
+    frame.style.width = '320px';
+    const inspectionGrid = board(); inspectionGrid[0] = [2, 4, 8, 16];
+    await load(inspectionGrid, 999999, 999999);
+  } finally {
+    if (previous === null) localStorage.removeItem(key); else localStorage.setItem(key, previous);
+    if (previousBest === null) localStorage.removeItem(bestKey); else localStorage.setItem(bestKey, previousBest);
+    summary.textContent = `${passed} passed; ${failed} failed. Saved state restored.`;
+    document.querySelector('#run').disabled = false;
+  }
+};
+</script></body></html>

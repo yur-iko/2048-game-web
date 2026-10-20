@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f3eb">
+  <meta name="description" content="A fresh take on the classic 2048 puzzle. Slide the tiles, combine matching numbers, and make your way to 2048. Play with your keyboard or swipe on your phone.">
+  <title>2048 — Good things add up.</title>
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+  <link rel="preload" href="./assets/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="./style.css">
+  <script defer src="./engine.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#board">Skip to game</a>
+  <div class="page">
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="2048 home">
+        <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true"><rect x="1" y="1" width="11" height="11" rx="2"/><rect x="16" y="1" width="11" height="11" rx="2"/><rect x="1" y="16" width="11" height="11" rx="2"/><rect x="16" y="16" width="11" height="11" rx="2"/></svg>
+        <span>the number puzzle</span>
+      </a>
+      <a class="help-link" href="#how-to-play">How to play <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
+    </header>
+
+    <main class="main-layout">
+      <section class="intro" aria-labelledby="game-title">
+        <h1 id="game-title">2048<span class="title-dot" aria-hidden="true">.</span></h1>
+        <p class="tagline">Good things<br>add up.</p>
+        <p class="description">A little focus. A few good moves.<br>Slide matching tiles together and<br class="desktop-break"> see how far you can go.</p>
+
+        <div class="tile-equation" aria-label="Two plus two equals four">
+          <span class="sample sample-two">2</span><span class="equation-symbol">+</span><span class="sample sample-two">2</span><span class="equation-symbol">=</span><span class="sample sample-four">4</span>
+        </div>
+
+        <div class="desktop-hint">
+          <div class="key-cluster" aria-hidden="true"><span class="key key-up"><svg viewBox="0 0 24 24"><path d="m6 14 6-6 6 6"/></svg></span><span class="key"><svg viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></svg></span><span class="key"><svg viewBox="0 0 24 24"><path d="m6 10 6 6 6-6"/></svg></span><span class="key"><svg viewBox="0 0 24 24"><path d="m10 6 6 6-6 6"/></svg></span></div>
+          <p>Arrow keys to move.<br><span>Or swipe. Your move.</span></p>
+        </div>
+      </section>
+
+      <section class="game" aria-label="Play 2048">
+        <div class="game-toolbar">
+          <div class="scores">
+            <div class="score-box"><span class="score-label">Score</span><span class="score-value" id="score">0</span><span class="score-gain" id="score-gain" aria-hidden="true"></span></div>
+            <div class="score-box best-box"><span class="score-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg>Best</span><span class="score-value" id="best">0</span></div>
+          </div>
+          <button class="button new-game" id="new-game" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1.4 7M4 4v6h6"/></svg><span>New Game</span></button>
+        </div>
+
+        <div class="board" id="board" tabindex="0" role="group" aria-label="2048 game board" aria-describedby="board-help">
+          <div class="grid-background" aria-hidden="true">
+            <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+          </div>
+          <div class="tile-layer" id="tiles" aria-hidden="true"></div>
+          <div class="sr-only"><table id="accessible-board"><caption>Current tiles; empty cells are marked empty</caption><tbody></tbody></table></div>
+          <section class="game-overlay" id="game-overlay" aria-labelledby="overlay-title" hidden>
+            <div class="overlay-content">
+              <span class="overlay-tile" id="overlay-tile" aria-hidden="true">2048</span>
+              <h2 id="overlay-title">You made it.</h2>
+              <p id="overlay-message">A little focus goes a long way.</p>
+              <button class="button" id="keep-playing" type="button">Keep playing</button>
+              <button class="button" id="try-again" type="button">Play again</button>
+            </div>
+          </section>
+        </div>
+
+        <div class="board-caption"><p id="board-help"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-4-4 4 4-4 4M8 8l-4 4 4 4"/></svg><span>Swipe or use arrow keys</span></p><span class="goal">Make <strong>2048</strong></span></div>
+        <p class="storage-notice" id="storage-notice" hidden>Progress can’t be saved in this browser. You can still play.</p>
+        <p class="sr-only" id="announcer" role="status" aria-live="polite" aria-atomic="true"></p>
+
+        <div class="direction-controls" role="group" aria-label="Move tiles">
+          <button type="button" data-direction="left" aria-label="Move left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button>
+          <button type="button" data-direction="up" aria-label="Move up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg></button>
+          <button type="button" data-direction="down" aria-label="Move down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 10 6 6 6-6"/></svg></button>
+          <button type="button" data-direction="right" aria-label="Move right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></button>
+        </div>
+      </section>
+
+      <section class="instructions" id="how-to-play" aria-labelledby="instructions-title">
+        <h2 id="instructions-title">One rule. Endless possibilities.</h2>
+        <div class="instruction-copy"><p>Move the tiles with your <strong>arrow keys</strong> or <strong>swipe</strong> on the board. When two matching numbers meet, they merge into one.</p><p>Every move brings a new tile. Keep making room, think a move ahead, and work your way to <strong>2048</strong>.</p></div>
+      </section>
+    </main>
+
+    <footer><p>A small pause. A fresh perspective.</p><span>Inspired by the original game by <a href="https://github.com/gabrielecirulli/2048" target="_blank" rel="noopener noreferrer">Gabriele Cirulli<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a></span></footer>
+  </div>
+  <noscript><p class="noscript">Please enable JavaScript to play 2048.</p></noscript>
+</body>
+</html>
