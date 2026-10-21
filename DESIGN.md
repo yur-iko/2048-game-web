@@ -301,7 +301,7 @@ The board contains gestures with `touch-action: none`; content outside it scroll
 
 Success and game-over reuse paper, the forest milestone swatch, centered headings, and familiar actions. The overlay fills the board with (24px) padding and a (220ms) opacity entrance. Its (90px) square badge reduces to (70px) on narrow screens. Focus moves to the appropriate action and returns to the board when play resumes.
 
-The reduced-motion media query disables CSS animations and transitions and changes smooth document scrolling to immediate scrolling. JavaScript skips spatial Web Animations in that mode; changing the preference during a move cancels the active effects and safely resolves the final board.
+Tile slides, merge pulses, and spawns always run through Web Animations regardless of the device's Reduced Motion preference, as explicitly requested by the user. Changing that preference during play does not interrupt a tile effect. The existing reduced-motion media query still disables other CSS animations and transitions and changes smooth document scrolling to immediate scrolling.
 
 ## Do's and Don'ts
 
@@ -309,7 +309,7 @@ The reduced-motion media query disables CSS animations and transitions and chang
 - **Do** reuse the actual paper, ink, and tile palette for new play states.
 - **Do** preserve the square four-by-four board across supported widths.
 - **Do** retain visible focus, semantic controls, and the screen-reader board table.
-- **Do** resolve animation immediately when reduced motion is requested.
+- **Do** preserve smooth tile slides, merges, and spawns regardless of the device's motion preference.
 
 ### Don't:
 - **Don't** replace tile numbers with color-only meaning.

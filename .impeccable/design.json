@@ -583,7 +583,7 @@
       {
         "name": "reduced-motion",
         "value": "none",
-        "purpose": "Disable CSS motion, skip Web Animations, and safely finish an active move when the preference changes."
+        "purpose": "Device Reduced Motion affects only other CSS interface transitions and document scrolling. Tile slides, merges, and spawns always run and are not canceled by preference changes, as explicitly requested by the user."
       },
       {
         "name": "theme-feedback",
@@ -759,7 +759,7 @@
       "Do reuse the actual paper, ink, and tile palette for new play states.",
       "Do preserve the square four-by-four board across supported widths.",
       "Do retain visible focus, semantic controls, and the screen-reader board table.",
-      "Do resolve animation immediately when reduced motion is requested."
+      "Do preserve smooth tile slides, merges, and spawns regardless of the device motion preference."
     ],
     "donts": [
       "Don't replace tile numbers with color-only meaning.",

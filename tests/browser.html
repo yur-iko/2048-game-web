@@ -28,7 +28,7 @@ async function reload() {
 async function loadPreferences(grid, { dark = false, reduce = false } = {}) {
   localStorage.setItem(key, JSON.stringify({ version: 1, board: grid, score: 0, won: false, continued: false }));
   const html = await (await fetch('../index.html')).text();
-  const preferences = `<base href="../"><script>
+  const preferences = `<base href="../">${reduce ? '<style>html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}</style>' : ''}<script>
     const actualMatchMedia = window.matchMedia.bind(window);
     window.testMotion = Object.assign(new EventTarget(), { matches: ${reduce}, media: '(prefers-reduced-motion: reduce)' });
     window.testColorScheme = Object.assign(new EventTarget(), { matches: ${dark}, media: '(prefers-color-scheme: dark)' });
@@ -218,8 +218,8 @@ document.querySelector('#run').onclick = async () => {
       assert(doc().documentElement.dataset.theme === 'light', 'invalid saved theme accepted');
       localStorage.setItem(themeKey, 'light');
     });
-    await test('tiles visibly interpolate and retain their DOM identity after sliding', async () => {
-      const grid = board(); grid[0] = [2, 0, 0, 4]; await loadPreferences(grid);
+    for (const reduce of [false, true]) await test(`tiles interpolate and retain identity with Reduced Motion ${reduce ? 'on' : 'off'}`, async () => {
+      const grid = board(); grid[0] = [2, 0, 0, 4]; await loadPreferences(grid, { reduce });
       const moving = doc().querySelector('.tile[data-value="4"]');
       const stationary = doc().querySelector('.tile[data-value="2"]');
       const start = moving.getBoundingClientRect().left;
@@ -232,10 +232,10 @@ document.querySelector('#run').onclick = async () => {
       await pause();
       assert(moving.isConnected && stationary.isConnected, 'tiles were rebuilt after the slide');
       assert(Math.abs(moving.getBoundingClientRect().left - target) < 1, 'slide missed its destination');
-      motionSamples.push({ start, middle, target, retained: moving.isConnected });
+      motionSamples.push({ reducedMotion: reduce, start, middle, target, retained: moving.isConnected });
     });
-    await test('merge survivors persist while merge and spawn effects finish independently', async () => {
-      const grid = board(); grid[0] = [2, 2, 4, 0]; await loadPreferences(grid);
+    for (const reduce of [false, true]) await test(`merge and spawn effects finish with Reduced Motion ${reduce ? 'on' : 'off'}`, async () => {
+      const grid = board(); grid[0] = [2, 2, 4, 0]; await loadPreferences(grid, { reduce });
       const pair = [...doc().querySelectorAll('.tile[data-value="2"]')];
       const originalFour = doc().querySelector('.tile[data-value="4"]');
       press('ArrowLeft');
@@ -257,17 +257,20 @@ document.querySelector('#run').onclick = async () => {
       assert(doc().documentElement.dataset.theme === 'dark', 'theme switch lost during movement');
       localStorage.setItem(themeKey, 'light');
     });
-    await test('reduced motion resolves immediately and can interrupt a live slide', async () => {
-      const grid = board(); grid[1][1] = 128; await loadPreferences(grid, { reduce: true });
-      press('ArrowLeft'); await new Promise(resolve => setTimeout(resolve, 0));
-      assert(doc().querySelectorAll('.tile').length === 2 && saved().board[1][0] === 128, 'reduced-motion move delayed');
-      assert([...doc().querySelectorAll('.tile, .tile-inner')].every(element => element.getAnimations().length === 0), 'reduced motion still animates tiles');
-      await loadPreferences(grid);
+    await test('changing Reduced Motion during a slide does not cancel tile animation', async () => {
+      const grid = board(); grid[1][1] = 128; await loadPreferences(grid);
+      const tile = doc().querySelector('.tile[data-value="128"]');
       press('ArrowLeft');
+      const animation = tile.getAnimations()[0];
+      assert(animation, 'slide animation missing');
       win().testMotion.matches = true;
       win().testMotion.dispatchEvent(new (win().Event)('change'));
-      await new Promise(resolve => setTimeout(resolve, 0));
-      assert(doc().querySelectorAll('.tile').length === 2 && saved().board[1][0] === 128, 'canceling motion lost board state');
+      assert(animation.playState === 'running', 'turning Reduced Motion on canceled the slide');
+      win().testMotion.matches = false;
+      win().testMotion.dispatchEvent(new (win().Event)('change'));
+      assert(animation.playState === 'running', 'turning Reduced Motion off canceled the slide');
+      await pause();
+      assert(tile.isConnected && doc().querySelectorAll('.tile').length === 2 && saved().board[1][0] === 128, 'preference change lost board state');
     });
     await test('text, controls, and every tile value retain contrast in both themes', async () => {
       const grid = board(); [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048].forEach((value, index) => { grid[Math.floor(index / 4)][index % 4] = value; });

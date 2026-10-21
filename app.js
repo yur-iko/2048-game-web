@@ -13,7 +13,6 @@
   const continueButton = document.querySelector('#keep-playing');
   const retryButton = document.querySelector('#try-again');
   const announcer = document.querySelector('#announcer');
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const formatter = new Intl.NumberFormat('en');
   let state;
   let best = 0;
@@ -65,7 +64,7 @@
   }
 
   function animate(element, frames, duration) {
-    if (reducedMotion.matches || !element.animate) return null;
+    if (!element.animate) return null;
     const animation = element.animate(frames, { duration, easing: 'cubic-bezier(.22,.8,.25,1)' });
     animations.add(animation);
     animation.finished.then(() => animations.delete(animation), () => animations.delete(animation));
@@ -293,9 +292,6 @@
 
   boardElement.addEventListener('touchcancel', () => { gesture = null; }, { passive: true });
   window.addEventListener('blur', () => { gesture = null; });
-  reducedMotion.addEventListener('change', () => {
-    if (reducedMotion.matches) animations.forEach(animation => animation.cancel());
-  });
   restore();
   render();
   persist();

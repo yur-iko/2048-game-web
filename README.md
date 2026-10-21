@@ -14,7 +14,7 @@ Matching tiles merge once per move, toward the movement direction. Each valid mo
 
 Your board, current score, best score, and choice to continue after winning are saved in this browser's local storage. Clearing site data clears them. A fresh game still works when storage is blocked. Touch scrolling is disabled on the board; the rest of the page scrolls normally.
 
-Tiles retain their elements through each move: a 180ms slide resolves into a merge pulse and a new-tile appearance. A short input queue handles quick consecutive moves, and a restart cancels pending animation safely. Reduced-motion preferences resolve movement immediately.
+Tiles retain their elements through each move: a 180ms slide resolves into a merge pulse and a new-tile appearance. A short input queue handles quick consecutive moves, and a restart cancels pending animation safely. Tile slides, merges, and spawns always animate, whether the device's Reduced Motion setting is on or off. Other interface transitions still follow that preference.
 
 ## Preview locally
 
