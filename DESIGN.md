@@ -14,6 +14,8 @@ colors:
   best-surface: "#e1e8ca"
   score-label: "#51594a"
   button-text: "#fffdf6"
+  button-bg: "#252a25"
+  tile-ink: "#252a25"
   button-hover: "#424c39"
   direction-border: "#ccd1bf"
   direction-ink: "#515d43"
@@ -106,7 +108,7 @@ spacing:
   spread: "92px"
 components:
   button-primary:
-    backgroundColor: "{colors.ink}"
+    backgroundColor: "{colors.button-bg}"
     textColor: "{colors.button-text}"
     typography: "{typography.button}"
     rounded: "{rounded.control}"
@@ -142,7 +144,7 @@ components:
     padding: "10px 15px 9px"
   tile-swatch:
     backgroundColor: "{colors.tile-2}"
-    textColor: "{colors.ink}"
+    textColor: "{colors.tile-ink}"
     typography: "{typography.tile}"
     rounded: "{rounded.tile}"
   game-board:
@@ -176,7 +178,39 @@ The interface stays calm during repeated play: dark primary actions, small citru
 
 ## Colors
 
-The frontmatter owns exact values; names below describe their jobs.
+The frontmatter owns the light defaults; names below describe their jobs.
+
+### Light and dark themes
+
+The dark variant remaps semantic surfaces and text while retaining the swatch colors, geometry, and dark tile numerals. The header button switches both modes without changing the board or scores. Theme selection applies before the stylesheet paints, follows the system until the player chooses a mode, and is stored separately under `good-things-2048-theme`.
+
+| CSS token | Light | Dark |
+| --- | --- | --- |
+| paper | #f5f3eb | #171d1a |
+| ink | #252a25 | #edf0e4 |
+| muted | #65695e | #abb5a5 |
+| line | #d9d9cc | #384337 |
+| board | #d7dacd | #3a453c |
+| cell | #e8eade | #263027 |
+| accent | #7f9149 | #b4c87b |
+| focus | #566b24 | #d0e58a |
+| scroll-thumb | #9da48c | #657b54 |
+| key-border | #c5caba | #6b7d60 |
+| score-surface | #e8e9de | #283329 |
+| best-surface | #e1e8ca | #35442b |
+| score-label | #51594a | #c1cbb2 |
+| button-bg | #252a25 | #deee90 |
+| button-text | #fffdf6 | #252a25 |
+| button-hover | #424c39 | #c7dd76 |
+| direction-border | #ccd1bf | #6b7d60 |
+| direction-ink | #515d43 | #c1d1af |
+| overlay-paper | rgb(245 243 235 / 96%) | rgb(23 29 26 / 97%) |
+| secondary-surface | #e0e5d3 | #35432f |
+| secondary-hover | #ccd8b0 | #43533a |
+| strong | #424b39 | #d6dfc8 |
+| error | #7a3e2e | #f0b29d |
+
+Canvas and text changes settle over 180ms. Reduced motion removes that transition. Selection and tile numerals retain dark ink for contrast on the pastel swatches.
 
 ### Primary
 
@@ -243,7 +277,7 @@ Square swatches define the geometry. The board, tiles, controls, score cards, an
 
 ### Buttons
 
-Primary actions use ink, warm lettering, the control radius, and the extracted padding. Minimum height is (46px), (44px) for mobile New Game, and (48px) inside overlays. Hover uses button-hover; pressing moves down (1px). Background and transform transitions take (160ms). Companion overlay actions use the tonal secondary surface and its hover token. Disabled buttons use (.5) opacity and a default cursor.
+Primary actions use the theme's button background and lettering, the control radius, and the extracted padding. Minimum height is (46px), (44px) for mobile New Game, and (48px) inside overlays. Hover uses button-hover; pressing moves down (1px). Background and transform transitions take (160ms). Companion overlay actions use the tonal secondary surface and its hover token. Disabled buttons use (.5) opacity and a default cursor.
 
 ### Directional controls
 
@@ -255,11 +289,11 @@ Normal minimum size is (94px) by (70px), with the score-card padding. Mobile use
 
 ### Header navigation
 
-The small four-square SVG brand and help anchor sit on opposite ends of a ruled header. Help has a minimum (44px) interactive height, an arrow SVG, olive hover, and visible focus. Mobile scales the existing brand and type without introducing a drawer.
+The small four-square SVG brand and a theme button sit on opposite ends of a ruled header. The button is at least (44px) high, with a sun or moon SVG and an accessible action label naming the next mode. Its resting border uses line; hover uses score-surface and accent. The instructions remain below the board. Mobile uses (12px) type and (8px 10px) padding.
 
 ### Board and tiles
 
-The signature surface is a responsive square containing sixteen tonal cells and numbered swatches. Live tiles move from their actual previous coordinates. Slides take (140ms) with `cubic-bezier(.2,.75,.3,1)`; a new tile scales from (.4) to (1) over (200ms); a merge peaks at (1.12) and settles over (220ms). Spawn and merge use `cubic-bezier(.19, 1, .22, 1)`. JavaScript resolves the normal slide after (145ms), or (0ms) with reduced motion. Fresh games retain real empty cells and two real tiles.
+The signature surface is a responsive square containing sixteen tonal cells and numbered swatches. Persistent tile elements slide between explicit transform endpoints over (180ms), using `cubic-bezier(.22,.8,.25,1)`. Completion of the actual Web Animation resolves a merge, removes only the consumed partner, and introduces one new tile. Spawn scales from (.55) to (1), fading from (.25) to (1) over (200ms). Merge peaks at (1.13) at a (.4) offset and settles over (210ms). Parent slides and child effects run independently, so consecutive moves do not erase ongoing feedback. Up to three pending directions are queued; restart cancels animations and invalidates stale completions. Fresh games retain real empty cells and two real tiles.
 
 The board contains gestures with `touch-action: none`; content outside it scrolls normally. Semantic controls, a readable hidden table, and polite announcements support nonvisual play.
 
@@ -267,7 +301,7 @@ The board contains gestures with `touch-action: none`; content outside it scroll
 
 Success and game-over reuse paper, the forest milestone swatch, centered headings, and familiar actions. The overlay fills the board with (24px) padding and a (220ms) opacity entrance. Its (90px) square badge reduces to (70px) on narrow screens. Focus moves to the appropriate action and returns to the board when play resumes.
 
-The reduced-motion media query disables animations and transitions and changes smooth document scrolling to immediate scrolling.
+The reduced-motion media query disables CSS animations and transitions and changes smooth document scrolling to immediate scrolling. JavaScript skips spatial Web Animations in that mode; changing the preference during a move cancels the active effects and safely resolves the final board.
 
 ## Do's and Don'ts
 

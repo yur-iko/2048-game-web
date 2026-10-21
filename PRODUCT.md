@@ -21,6 +21,8 @@ A complete classic 2048 game that works on mobile and desktop and can be hosted 
 - Score tracking, New Game, win at 2048, and game-over detection.
 - Full touch start/move/end swipe controls, preventing scrolling on the game board, and keyboard controls.
 - Responsive layout and distinct colors for powers of two through 2048.
+- A header light/dark toggle replaces the How to play link; instructions remain below the board. Theme choice persists independently of game progress, initially following the system preference.
+- Fluid tile slides, merges, and spawns retain tile identity through consecutive moves and respect reduced motion.
 - Save the completed project in D:\Coding\yur-iko\2048-game-web, configure Git locally, and leave account-level administration to the user.
 
 ## Implementation Assumptions

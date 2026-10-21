@@ -18,9 +18,11 @@
   let state;
   let best = 0;
   let tiles = new Map();
-  let animationTimer;
+  const animations = new Set();
+  const slideDuration = 180;
+  let moveVersion = 0;
   let busy = false;
-  let pendingDirection = null;
+  const pendingDirections = [];
   let gesture = null;
   let storageAvailable = true;
 
@@ -62,32 +64,56 @@
     element.style.setProperty('--col', position[1]);
   }
 
-  function render(spawned = null, merged = []) {
+  function animate(element, frames, duration) {
+    if (reducedMotion.matches || !element.animate) return null;
+    const animation = element.animate(frames, { duration, easing: 'cubic-bezier(.22,.8,.25,1)' });
+    animations.add(animation);
+    animation.finished.then(() => animations.delete(animation), () => animations.delete(animation));
+    return animation;
+  }
+
+  function updateTile(tile, value) {
+    const digits = String(value).length;
+    tile.dataset.value = value;
+    tile.classList.toggle('tile-super', value > 2048);
+    tile.classList.toggle('tile-three', digits === 3);
+    tile.classList.toggle('tile-four', digits === 4);
+    tile.classList.toggle('tile-five', digits === 5);
+    tile.classList.toggle('tile-long', digits > 5);
+    tile.firstElementChild.textContent = value;
+  }
+
+  function createTile(value, position) {
+    const tile = document.createElement('div');
+    tile.className = 'tile';
+    const inner = document.createElement('span');
+    inner.className = 'tile-inner';
+    tile.append(inner);
+    updateTile(tile, value);
+    placeTile(tile, position);
+    tileLayer.append(tile);
+    return tile;
+  }
+
+  function appear(tile) {
+    animate(tile.firstElementChild, [
+      { transform: 'scale(.55)', opacity: .25 },
+      { transform: 'scale(1)', opacity: 1 }
+    ], 200);
+  }
+
+  function render() {
     tileLayer.replaceChildren();
     tiles = new Map();
-    const mergedKeys = new Set(merged.map(position => position.join(',')));
     state.board.forEach((row, r) => row.forEach((value, c) => {
       if (!value) return;
-      const tile = document.createElement('div');
-      const digits = String(value).length;
-      tile.className = 'tile';
-      if (value > 2048) tile.classList.add('tile-super');
-      if (digits === 3) tile.classList.add('tile-three');
-      if (digits === 4) tile.classList.add('tile-four');
-      if (digits === 5) tile.classList.add('tile-five');
-      if (digits > 5) tile.classList.add('tile-long');
-      if (spawned && spawned[0] === r && spawned[1] === c) tile.classList.add('spawned');
-      if (mergedKeys.has([r, c].join(','))) tile.classList.add('merged');
-      tile.dataset.value = value;
-      placeTile(tile, [r, c]);
-      const inner = document.createElement('span');
-      inner.className = 'tile-inner';
-      inner.textContent = value;
-      tile.append(inner);
-      tileLayer.append(tile);
+      const tile = createTile(value, [r, c]);
       tiles.set([r, c].join(','), tile);
     }));
+    updateInterface();
+  }
 
+  function updateInterface() {
     const tbody = document.querySelector('#accessible-board tbody');
     tbody.replaceChildren();
     state.board.forEach(row => {
@@ -125,16 +151,17 @@
     }
   }
 
-  function move(direction) {
+  async function move(direction) {
     if (!overlay.hidden) return;
     if (busy) {
-      pendingDirection = direction;
+      if (pendingDirections.length < 3) pendingDirections.push(direction);
       return;
     }
     const result = game.move(state.board, direction);
     if (!result.moved) return;
 
     busy = true;
+    const version = ++moveVersion;
     const spawned = game.spawn(result.board);
     state.board = spawned.board;
     state.score += result.gain;
@@ -143,39 +170,75 @@
     persist();
 
     const mergedKeys = new Set(result.merged.map(position => position.join(',')));
+    const nextTiles = new Map();
+    const consumed = [];
+    const motions = [];
+    const origins = new Map([...tiles.values()].map(tile => [tile, getComputedStyle(tile).transform]));
     result.transitions.forEach(transition => {
       const tile = tiles.get(transition.from.join(','));
-      if (tile) {
-        if (mergedKeys.has(transition.to.join(','))) tile.classList.add('merging');
-        placeTile(tile, transition.to);
-      }
+      const destination = transition.to.join(',');
+      if (nextTiles.has(destination)) consumed.push(tile);
+      else nextTiles.set(destination, tile);
+      if (mergedKeys.has(destination)) tile.classList.add('merging');
+      placeTile(tile, transition.to);
     });
 
-    animationTimer = window.setTimeout(() => {
-      render(spawned.position, result.merged);
-      if (overlay.hidden) announcer.textContent = `Moved ${direction}. ${result.gain ? `Merged for ${result.gain} points. ` : ''}Score ${state.score}. Highest tile ${game.highest(state.board)}.`;
-      if (result.gain) {
-        gainElement.textContent = `+${formatter.format(result.gain)}`;
-        gainElement.classList.remove('show');
-        void gainElement.offsetWidth;
-        gainElement.classList.add('show');
+    // Explicit endpoints also animate consecutive moves before a browser paint.
+    tiles.forEach(tile => {
+      const from = origins.get(tile);
+      const to = getComputedStyle(tile).transform;
+      if (from === to) return;
+      tile.classList.add('sliding');
+      const animation = animate(tile, [{ transform: from }, { transform: to }], slideDuration);
+      if (animation) motions.push(animation.finished.catch(() => {}));
+    });
+    await Promise.all(motions);
+    if (version !== moveVersion) return;
+
+    consumed.forEach(tile => tile.remove());
+    nextTiles.forEach((tile, position) => {
+      const [row, col] = position.split(',').map(Number);
+      tile.classList.remove('merging', 'sliding');
+      updateTile(tile, state.board[row][col]);
+      if (mergedKeys.has(position)) {
+        (tile.firstElementChild.getAnimations?.() || []).forEach(animation => animation.cancel());
+        animate(tile.firstElementChild, [
+          { transform: 'scale(1)' },
+          { transform: 'scale(1.13)', offset: .4 },
+          { transform: 'scale(1)' }
+        ], 210);
       }
-      busy = false;
-      const next = pendingDirection;
-      pendingDirection = null;
-      if (next) move(next);
-    }, reducedMotion.matches ? 0 : 145);
+    });
+    const position = spawned.position;
+    const tile = createTile(state.board[position[0]][position[1]], position);
+    nextTiles.set(position.join(','), tile);
+    appear(tile);
+    tiles = nextTiles;
+    updateInterface();
+    if (overlay.hidden) announcer.textContent = `Moved ${direction}. ${result.gain ? `Merged for ${result.gain} points. ` : ''}Score ${state.score}. Highest tile ${game.highest(state.board)}.`;
+    if (result.gain) {
+      gainElement.textContent = `+${formatter.format(result.gain)}`;
+      gainElement.classList.remove('show');
+      void gainElement.offsetWidth;
+      gainElement.classList.add('show');
+    }
+    busy = false;
+    if (!overlay.hidden) pendingDirections.length = 0;
+    else if (pendingDirections.length) move(pendingDirections.shift());
   }
 
   function restart() {
-    window.clearTimeout(animationTimer);
+    moveVersion++;
+    animations.forEach(animation => animation.cancel());
+    animations.clear();
     busy = false;
-    pendingDirection = null;
+    pendingDirections.length = 0;
     gesture = null;
     state = { board: game.newGame(), score: 0, won: false, continued: false };
     gainElement.classList.remove('show');
     persist();
     render();
+    tiles.forEach(appear);
     announcer.textContent = 'New game started. Two tiles on the board. Score zero.';
     boardElement.focus({ preventScroll: true });
   }
@@ -185,7 +248,7 @@
   continueButton.addEventListener('click', () => {
     state.continued = true;
     persist();
-    render();
+    updateInterface();
     if (overlay.hidden) boardElement.focus({ preventScroll: true });
   });
   document.querySelectorAll('[data-direction]').forEach(button => {
@@ -230,6 +293,9 @@
 
   boardElement.addEventListener('touchcancel', () => { gesture = null; }, { passive: true });
   window.addEventListener('blur', () => { gesture = null; });
+  reducedMotion.addEventListener('change', () => {
+    if (reducedMotion.matches) animations.forEach(animation => animation.cancel());
+  });
   restore();
   render();
   persist();

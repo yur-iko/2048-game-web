@@ -8,10 +8,13 @@ A complete, responsive 2048 game built with plain HTML, CSS, and JavaScript. It 
 - **Phone or tablet:** swipe up, down, left, or right on the board.
 - **Any device:** use the four direction buttons below the board.
 - **New Game** resets the board and current score, keeping the best score.
+- **Dark mode / Light mode** in the header switches the entire interface. The first visit follows your system theme; your explicit choice is saved separately from game progress and survives reloads and New Game.
 
 Matching tiles merge once per move, toward the movement direction. Each valid move adds one random tile: 90% chance of a 2, 10% chance of a 4. A move that changes nothing does not add a tile. Reach 2048 to win, then keep playing or start again. A full board with no adjacent matching tiles ends the game.
 
 Your board, current score, best score, and choice to continue after winning are saved in this browser's local storage. Clearing site data clears them. A fresh game still works when storage is blocked. Touch scrolling is disabled on the board; the rest of the page scrolls normally.
+
+Tiles retain their elements through each move: a 180ms slide resolves into a merge pulse and a new-tile appearance. A short input queue handles quick consecutive moves, and a restart cancels pending animation safely. Reduced-motion preferences resolve movement immediately.
 
 ## Preview locally
 
@@ -67,6 +70,7 @@ Optional syntax checks:
 ```sh
 node --check engine.js
 node --check app.js
+node --check theme.js
 node --check scripts/serve.cjs
 ```
 
@@ -80,6 +84,7 @@ If npm is installed, the equivalent convenience commands are `npm start`, `npm t
 | `style.css` | Responsive layout, tile palette, movement, focus styles, and reduced motion |
 | `engine.js` | Pure board, merging, spawn, win, and swipe logic |
 | `app.js` | Rendering, keyboard/touch input, animation, persistence, and restart |
+| `theme.js` | Initial theme selection, header toggle, and saved theme preference |
 | `assets/` | Self-hosted Manrope font, its OFL license, and the favicon |
 | `scripts/serve.cjs` | Dependency-free local preview server |
 | `tests/` | Node engine tests and the real-browser integration harness |
